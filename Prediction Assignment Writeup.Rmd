@@ -1,0 +1,128 @@
+---
+title: "Programming Assignment 10"
+author: "Victor Lacerda"
+date: "6/29/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Prediction Assignment Writeup
+
+# Background
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+# Data
+The training data for this project are available here: [https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv]
+
+The test data are available here: [https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv]
+
+The data for this project come from this source: [http://groupware.les.inf.puc-rio.br/har]. If you use the document you create for this class for any purpose please cite them as they have been very generous in allowing their data to be used for this kind of assignment.
+
+# What you should submit
+The goal of your project is to predict the manner in which they did the exercise. This is the “classe” variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+Your submission should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-). You should also apply your machine learning algorithm to the 20 test cases available in the test data above. Please submit your predictions in appropriate format to the programming assignment for automated grading. See the programming assignment for additional details.
+
+# Approach
+In this dataset “participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in 5 different fashions: - exactly according to the specification (Class A) - throwing the elbows to the front (Class B) - lifting the dumbbell only halfway (Class C) - lowering the dumbbell only halfway (Class D) - throwing the hips to the front (Class E)". To correctly classify the manner they did the exercise (var: classe), I will employ two models:
+1. Decision Tree
+2. Random Forest model
+The model with the highest accuracy will be chosen as our final model.
+
+# Cross-validation
+Cross-validation will be performed by subsampling our training data set randomly without replacement into 2 subsamples: TrainingTrain data (75% of the original Training data set) and TrainingTest data (25%). The models will be fitted on the TrainingTrain dataset, and then tested on the TrainingTest, after choosing the model with the highest accuracy a final test will be perfomed on the FinalTest dataset.
+
+1. Downloading/Loading Data
+
+```{r}
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", "Training.csv")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", "FinalTest.csv")
+
+Training <- read.csv("Training.csv", na.strings=c("NA","#DIV/0!", ""))
+FinalTest <- read.csv("FinalTest.csv", na.strings=c("NA","#DIV/0!", ""))
+```
+
+
+2. Cleaning Data
+
+```{r}
+library(dplyr); library(tidyr)
+
+Training <- Training %>%
+        select(-c(X, user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window)) %>%
+        select_if(~!all(is.na(.)))
+
+FinalTest <- FinalTest %>%
+        select(-c(user_name, raw_timestamp_part_1, raw_timestamp_part_2, cvtd_timestamp, new_window, num_window))
+                  
+```
+
+3. Creating TrainingTrain & TrainingTest
+
+```{r}
+library(caret)
+set.seed(1234)
+
+index <- createDataPartition(Training$classe, p = 0.75, list = F)
+TrainingTrain <- Training[index,]
+TrainingTest <- Training[-index,]
+
+```
+
+4. Exploratory Analysis
+
+```{r}
+library(ggplot2)
+
+p1 <- ggplot(TrainingTrain, aes(y = classe)) + geom_bar()
+p1
+
+```
+
+5. Decision Tree
+
+```{r}
+library(rpart); library(rpart.plot); library(rattle)
+
+model1 <- rpart(classe ~ ., TrainingTrain, method = "class")
+
+prediction1 <- predict(model1, TrainingTest, type = "class")
+
+# Plot the Decision Tree
+rpart.plot(model1, main="Classification Tree", extra=102, under=TRUE, faclen=0)
+        
+```
+Testing:
+
+```{r}
+confusionMatrix(prediction1, TrainingTest$classe)
+```
+
+7. Random Forest
+
+```{r}
+library(randomForest)
+
+model2 <- randomForest(classe ~ . , TrainingTrain, method = "class", na.action = na.roughfix)
+
+prediction2 <- predict(model2, TrainingTest, type = "class")
+
+```
+
+Testing:
+```{r}
+confusionMatrix(prediction2, TrainingTest$classe)
+```
+
+8. Model Analysis
+Judging from the above performance, the Random Forrest model performs better than the Decision Tree model, with an accuracy of 1 and a 95% CI : (0.944, 1) compared to an accuracy of 0.75 and a 95% CI :(0.7331, 0.7577). The expected out of sample error is estimated to be 0%.
+
+9. Final Test
+
+```{r}
+predictionfinal <- predict(model2, FinalTest, type = "class")
+predictionfinal
+```
